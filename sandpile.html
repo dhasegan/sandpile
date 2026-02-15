@@ -80,6 +80,12 @@
             z-index: 10;
         }
 
+        .cell.disabled {
+            pointer-events: none;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .cell.height-0 { background: #f0f0f0; color: #ccc; }
         .cell.height-1 { background: #fff4e6; color: #e67e22; }
         .cell.height-2 { background: #ffe4b3; color: #d35400; }
@@ -113,11 +119,23 @@
             text-align: center;
             margin: 20px 0;
             padding: 15px;
-            background: linear-gradient(135deg, #e74c3c 0%, #3498db 100%);
             border-radius: 10px;
             color: white;
             font-size: 1.3em;
             font-weight: bold;
+            transition: background 0.3s ease;
+        }
+
+        .player-turn.player1 {
+            background: #e74c3c;
+        }
+
+        .player-turn.player2 {
+            background: #3498db;
+        }
+
+        .player-turn.random {
+            background: #95a5a6;
         }
 
         .player-scores {
@@ -166,6 +184,7 @@
 
         .player-1 { color: #e74c3c; }
         .player-2 { color: #3498db; }
+        .player-random { color: #95a5a6; }
 
         .avalanche-history {
             max-height: 300px;
@@ -235,11 +254,24 @@
 
         .toppling {
             animation: topple 0.3s ease;
+            box-shadow: 0 0 20px 5px rgba(255, 100, 50, 0.8) !important;
+            z-index: 100 !important;
         }
 
         @keyframes topple {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); background-color: #ff3333; }
+            0% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% {
+                transform: scale(1.3);
+                background-color: #ff3333 !important;
+                filter: brightness(1.5);
+            }
+            100% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
         }
 
         .power-law-plot {
@@ -287,7 +319,7 @@
             <button onclick="resetGame()">New Game</button>
         </div>
 
-        <div class="player-turn" id="playerTurn">
+        <div class="player-turn player1" id="playerTurn">
             Player 1's Turn
         </div>
 
@@ -306,6 +338,11 @@
                         <h3 class="player-2">Player 2</h3>
                         <div class="player-score-value" id="player2Score">0</div>
                     </div>
+                </div>
+
+                <div class="stat-box">
+                    <h3 class="player-random">Random Score</h3>
+                    <div class="stat-value" id="randomScore" style="color: #95a5a6;">0</div>
                 </div>
 
                 <div class="stat-box">
@@ -351,10 +388,13 @@
                 );
                 this.player1Score = 0;
                 this.player2Score = 0;
+                this.randomScore = 0;
                 this.currentPlayer = 1;
                 this.moveCount = 0;
                 this.maxAvalanche = 0;
                 this.avalancheHistory = [];
+                this.isProcessing = false; // Track if game is processing a move
+                this.isRandomPhase = false; // Track if we're in the random adds phase
 
                 // Track avalanche size distributions for power-law plot
                 this.player1Avalanches = {}; // {size: count}
@@ -370,7 +410,13 @@
                 this.drawPowerLawPlot();
             }
 
-            addRandomGrains() {
+            async addRandomGrains() {
+                // Show random grains phase
+                this.isRandomPhase = true;
+                const playerTurnDiv = document.getElementById('playerTurn');
+                playerTurnDiv.textContent = 'Random Adds';
+                playerTurnDiv.className = 'player-turn random';
+
                 for (let n = 0; n < this.randomAdds; n++) {
                     const row = Math.floor(Math.random() * this.size);
                     const col = Math.floor(Math.random() * this.size);
@@ -378,20 +424,37 @@
                 }
 
                 // Topple any resulting avalanches and track them
-                const avalancheSize = this.topple();
+                const avalancheSize = await this.topple();
                 if (avalancheSize > 0) {
                     this.randomAvalanches[avalancheSize] = (this.randomAvalanches[avalancheSize] || 0) + 1;
+                    this.randomScore += avalancheSize;
+                    this.maxAvalanche = Math.max(this.maxAvalanche, avalancheSize);
+                    this.avalancheHistory.unshift({
+                        move: 'Random',
+                        player: 'Random',
+                        size: avalancheSize,
+                        position: 'Multiple'
+                    });
                 }
 
+                this.isRandomPhase = false;
                 this.updateDisplay();
                 this.drawPowerLawPlot();
             }
 
-            addGrain(row, col) {
+            async addGrain(row, col) {
+                // Prevent moves while processing
+                if (this.isProcessing) {
+                    return;
+                }
+
+                this.isProcessing = true;
+                this.disableGrid();
+
                 this.grid[row][col]++;
                 this.moveCount++;
 
-                const avalancheSize = this.topple();
+                const avalancheSize = await this.topple();
 
                 if (avalancheSize > 0) {
                     if (this.currentPlayer === 1) {
@@ -415,16 +478,23 @@
                 // Switch players
                 this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
 
-                this.updateDisplay();
                 this.drawPowerLawPlot(); // Update the plot
 
                 // Add random grains after player move
                 if (this.randomAdds > 0) {
-                    setTimeout(() => this.addRandomGrains(), 300);
+                    setTimeout(async () => {
+                        await this.addRandomGrains();
+                        this.isProcessing = false;
+                        this.enableGrid();
+                    }, 300);
+                } else {
+                    this.updateDisplay();
+                    this.isProcessing = false;
+                    this.enableGrid();
                 }
             }
 
-            topple() {
+            async topple() {
                 let totalTopples = 0;
                 let changed = true;
                 const toppledCells = new Set();
@@ -458,8 +528,9 @@
                     }
 
                     if (changed) {
-                        // Small delay to show the avalanche propagation
+                        // Update display and wait to show the avalanche propagation
                         this.updateDisplay();
+                        await new Promise(resolve => setTimeout(resolve, 150));
                     }
                 }
 
@@ -482,13 +553,29 @@
                         const cell = document.getElementById(`cell-${i}-${j}`);
                         const height = this.grid[i][j];
                         cell.textContent = height;
+
+                        // Preserve disabled state while updating height class
+                        const isDisabled = cell.classList.contains('disabled');
                         cell.className = `cell height-${Math.min(height, 4)}`;
+                        if (isDisabled) {
+                            cell.classList.add('disabled');
+                        }
                     }
                 }
 
-                // Update current player indicator
-                const playerTurnDiv = document.getElementById('playerTurn');
-                playerTurnDiv.textContent = `Player ${this.currentPlayer}'s Turn`;
+                // Update current player indicator (but not during random phase)
+                if (!this.isRandomPhase) {
+                    const playerTurnDiv = document.getElementById('playerTurn');
+                    playerTurnDiv.textContent = `Player ${this.currentPlayer}'s Turn`;
+
+                    // Update player turn color
+                    playerTurnDiv.className = 'player-turn';
+                    if (this.currentPlayer === 1) {
+                        playerTurnDiv.classList.add('player1');
+                    } else {
+                        playerTurnDiv.classList.add('player2');
+                    }
+                }
 
                 // Update player score boxes
                 document.getElementById('player1Box').classList.toggle('active', this.currentPlayer === 1);
@@ -497,17 +584,26 @@
                 // Update stats
                 document.getElementById('player1Score').textContent = this.player1Score;
                 document.getElementById('player2Score').textContent = this.player2Score;
+                document.getElementById('randomScore').textContent = this.randomScore;
                 document.getElementById('moveCount').textContent = this.moveCount;
                 document.getElementById('maxAvalanche').textContent = this.maxAvalanche;
 
                 // Update history
                 const historyDiv = document.getElementById('history');
-                historyDiv.innerHTML = this.avalancheHistory.slice(0, 20).map(av => `
-                    <div class="avalanche-item">
-                        <span>P${av.player} Move ${av.move} at ${av.position}</span>
-                        <span class="avalanche-size">${av.size} topples</span>
-                    </div>
-                `).join('');
+                historyDiv.innerHTML = this.avalancheHistory.slice(0, 20).map(av => {
+                    const playerLabel = av.player === 'Random'
+                        ? '<span style="color: #95a5a6;">Random</span>'
+                        : `P${av.player}`;
+                    const moveLabel = av.player === 'Random'
+                        ? 'at Multiple'
+                        : `Move ${av.move} at ${av.position}`;
+                    return `
+                        <div class="avalanche-item">
+                            <span>${playerLabel} ${moveLabel}</span>
+                            <span class="avalanche-size">${av.size} topples</span>
+                        </div>
+                    `;
+                }).join('');
             }
 
             renderGrid() {
@@ -524,6 +620,28 @@
                         cell.textContent = height;
                         cell.onclick = () => this.addGrain(i, j);
                         gridDiv.appendChild(cell);
+                    }
+                }
+            }
+
+            disableGrid() {
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        const cell = document.getElementById(`cell-${i}-${j}`);
+                        if (cell) {
+                            cell.classList.add('disabled');
+                        }
+                    }
+                }
+            }
+
+            enableGrid() {
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        const cell = document.getElementById(`cell-${i}-${j}`);
+                        if (cell) {
+                            cell.classList.remove('disabled');
+                        }
                     }
                 }
             }
