@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sandpile Avalanche Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .instructions {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .game-area {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .grid-container {
+            flex: 1;
+        }
+
+        .grid {
+            display: grid;
+            gap: 2px;
+            background: #ddd;
+            padding: 2px;
+            border-radius: 8px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+
+        .cell:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        .cell.height-0 { background: #f0f0f0; color: #ccc; }
+        .cell.height-1 { background: #fff4e6; color: #e67e22; }
+        .cell.height-2 { background: #ffe4b3; color: #d35400; }
+        .cell.height-3 { background: #ffb347; color: #a04000; }
+        .cell.height-4 { background: #ff6b35; color: white; }
+
+        .stats {
+            flex: 0 0 250px;
+        }
+
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .player-turn {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .player-scores {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .player-score-box {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .player-score-box.active {
+            border-color: #667eea;
+            background: #e8ecff;
+        }
+
+        .player-score-box h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        .player-score-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .player-1 { color: #667eea; }
+        .player-2 { color: #764ba2; }
+
+        .avalanche-history {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .avalanche-history h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .avalanche-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .avalanche-size {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .grid-size-control {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .grid-size-control label {
+            margin-right: 10px;
+            color: #666;
+        }
+
+        .grid-size-control input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .toppling {
+            animation: topple 0.3s ease;
+        }
+
+        @keyframes topple {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); background-color: #ff3333; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏔️ Sandpile Avalanche Game</h1>
+        <div class="instructions">
+            Two-player competitive game! The board starts with random sand grains (0-3 per cell). Players take turns clicking cells to add grains. When a cell reaches 4 grains, it topples and distributes sand to neighbors, creating avalanches. Score points for each topple you trigger - highest score wins!
+        </div>
+
+        <div class="grid-size-control">
+            <label for="gridSize">Grid Size:</label>
+            <input type="number" id="gridSize" min="5" max="30" value="15">
+            <button onclick="resetGame()">New Game</button>
+        </div>
+
+        <div class="player-turn" id="playerTurn">
+            Player 1's Turn
+        </div>
+
+        <div class="game-area">
+            <div class="grid-container">
+                <div id="grid" class="grid"></div>
+            </div>
+
+            <div class="stats">
+                <div class="player-scores">
+                    <div class="player-score-box active" id="player1Box">
+                        <h3 class="player-1">Player 1</h3>
+                        <div class="player-score-value" id="player1Score">0</div>
+                    </div>
+                    <div class="player-score-box" id="player2Box">
+                        <h3 class="player-2">Player 2</h3>
+                        <div class="player-score-value" id="player2Score">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-box">
+                    <h3>Moves Made</h3>
+                    <div class="stat-value" id="moveCount">0</div>
+                </div>
+
+                <div class="stat-box">
+                    <h3>Largest Avalanche</h3>
+                    <div class="stat-value" id="maxAvalanche">0</div>
+                </div>
+
+                <div class="avalanche-history">
+                    <h3>Avalanche History</h3>
+                    <div id="history"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="resetGame()">Reset Game</button>
+        </div>
+    </div>
+
+    <script>
+        class SandpileGame {
+            constructor(size) {
+                this.size = size;
+                // Initialize grid with random values from 0 to 3
+                this.grid = Array(size).fill(0).map(() =>
+                    Array(size).fill(0).map(() => Math.floor(Math.random() * 4))
+                );
+                this.player1Score = 0;
+                this.player2Score = 0;
+                this.currentPlayer = 1;
+                this.moveCount = 0;
+                this.maxAvalanche = 0;
+                this.avalancheHistory = [];
+            }
+
+            addGrain(row, col) {
+                this.grid[row][col]++;
+                this.moveCount++;
+
+                const avalancheSize = this.topple();
+
+                if (avalancheSize > 0) {
+                    if (this.currentPlayer === 1) {
+                        this.player1Score += avalancheSize;
+                    } else {
+                        this.player2Score += avalancheSize;
+                    }
+                    this.maxAvalanche = Math.max(this.maxAvalanche, avalancheSize);
+                    this.avalancheHistory.unshift({
+                        move: this.moveCount,
+                        player: this.currentPlayer,
+                        size: avalancheSize,
+                        position: `(${row}, ${col})`
+                    });
+                }
+
+                // Switch players
+                this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+
+                this.updateDisplay();
+            }
+
+            topple() {
+                let totalTopples = 0;
+                let changed = true;
+                const toppledCells = new Set();
+
+                while (changed) {
+                    changed = false;
+                    const currentTopples = [];
+
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            if (this.grid[i][j] >= 4) {
+                                currentTopples.push([i, j]);
+                                changed = true;
+                            }
+                        }
+                    }
+
+                    for (const [i, j] of currentTopples) {
+                        this.grid[i][j] -= 4;
+                        totalTopples++;
+                        toppledCells.add(`${i},${j}`);
+
+                        // Add to neighbors
+                        if (i > 0) this.grid[i - 1][j]++;
+                        if (i < this.size - 1) this.grid[i + 1][j]++;
+                        if (j > 0) this.grid[i][j - 1]++;
+                        if (j < this.size - 1) this.grid[i][j + 1]++;
+
+                        // Visual feedback
+                        this.animateTopple(i, j);
+                    }
+
+                    if (changed) {
+                        // Small delay to show the avalanche propagation
+                        this.updateDisplay();
+                    }
+                }
+
+                return totalTopples;
+            }
+
+            animateTopple(row, col) {
+                const cellId = `cell-${row}-${col}`;
+                const cell = document.getElementById(cellId);
+                if (cell) {
+                    cell.classList.add('toppling');
+                    setTimeout(() => cell.classList.remove('toppling'), 300);
+                }
+            }
+
+            updateDisplay() {
+                // Update grid
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        const cell = document.getElementById(`cell-${i}-${j}`);
+                        const height = this.grid[i][j];
+                        cell.textContent = height;
+                        cell.className = `cell height-${Math.min(height, 4)}`;
+                    }
+                }
+
+                // Update current player indicator
+                const playerTurnDiv = document.getElementById('playerTurn');
+                playerTurnDiv.textContent = `Player ${this.currentPlayer}'s Turn`;
+
+                // Update player score boxes
+                document.getElementById('player1Box').classList.toggle('active', this.currentPlayer === 1);
+                document.getElementById('player2Box').classList.toggle('active', this.currentPlayer === 2);
+
+                // Update stats
+                document.getElementById('player1Score').textContent = this.player1Score;
+                document.getElementById('player2Score').textContent = this.player2Score;
+                document.getElementById('moveCount').textContent = this.moveCount;
+                document.getElementById('maxAvalanche').textContent = this.maxAvalanche;
+
+                // Update history
+                const historyDiv = document.getElementById('history');
+                historyDiv.innerHTML = this.avalancheHistory.slice(0, 20).map(av => `
+                    <div class="avalanche-item">
+                        <span>P${av.player} Move ${av.move} at ${av.position}</span>
+                        <span class="avalanche-size">${av.size} topples</span>
+                    </div>
+                `).join('');
+            }
+
+            renderGrid() {
+                const gridDiv = document.getElementById('grid');
+                gridDiv.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
+                gridDiv.innerHTML = '';
+
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        const cell = document.createElement('div');
+                        cell.id = `cell-${i}-${j}`;
+                        const height = this.grid[i][j];
+                        cell.className = `cell height-${Math.min(height, 4)}`;
+                        cell.textContent = height;
+                        cell.onclick = () => this.addGrain(i, j);
+                        gridDiv.appendChild(cell);
+                    }
+                }
+            }
+        }
+
+        let game;
+
+        function initGame() {
+            const size = parseInt(document.getElementById('gridSize').value) || 15;
+            game = new SandpileGame(size);
+            game.renderGrid();
+            game.updateDisplay();
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // Initialize game on load
+        initGame();
+    </script>
+</body>
+</html>
