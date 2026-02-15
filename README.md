@@ -1,3 +1,5 @@
+!WARNING: This message is the only thing I wrote myself in this repo: The following README.md is auto-generated while vibe-coding the project. Please use it at your discretion and feel free to edit for clarity, accuracy, and style. It may be totally wrong or contain inaccuracies, so please verify all information before using it as a reference. The README is meant to provide an overview and guide for users, but it may not be perfect. Always refer to the actual code and comments for the most accurate information about the project.
+
 # Self-Organized Criticality Sandpile Game
 
 A competitive two-player browser game that demonstrates the Self-Organized Criticality (SOC) model through the classic Bak-Tang-Wiesenfeld sandpile simulation. Players take turns triggering avalanches and compete for the highest score!
@@ -150,7 +152,6 @@ Key SOC properties maintained:
 - **Self-organization**: System maintains near-critical density without tuning
 - **Scale invariance**: Avalanches of all sizes can occur
 
-See [SOC_ANALYSIS.md](SOC_ANALYSIS.md) for a detailed analysis based on Per Bak's book "How Nature Works."
 
 ## Technical Details
 
