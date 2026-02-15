@@ -26,7 +26,7 @@
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
+            max-width: 900px;
         }
 
         h1 {
@@ -113,7 +113,7 @@
             text-align: center;
             margin: 20px 0;
             padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #e74c3c 0%, #3498db 100%);
             border-radius: 10px;
             color: white;
             font-size: 1.3em;
@@ -136,8 +136,13 @@
         }
 
         .player-score-box.active {
-            border-color: #667eea;
-            background: #e8ecff;
+            border-color: #e74c3c;
+            background: #ffe8e6;
+        }
+
+        .player-score-box.active:last-child {
+            border-color: #3498db;
+            background: #e3f2fd;
         }
 
         .player-score-box h3 {
@@ -149,11 +154,18 @@
         .player-score-value {
             font-size: 1.8em;
             font-weight: bold;
-            color: #667eea;
         }
 
-        .player-1 { color: #667eea; }
-        .player-2 { color: #764ba2; }
+        #player1Score {
+            color: #e74c3c;
+        }
+
+        #player2Score {
+            color: #3498db;
+        }
+
+        .player-1 { color: #e74c3c; }
+        .player-2 { color: #3498db; }
 
         .avalanche-history {
             max-height: 300px;
@@ -229,18 +241,49 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.2); background-color: #ff3333; }
         }
+
+        .power-law-plot {
+            margin-top: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .power-law-plot h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .plot-description {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        #powerLawCanvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🏔️ Sandpile Avalanche Game</h1>
         <div class="instructions">
-            Two-player competitive game! The board starts with random sand grains (0-3 per cell). Players take turns clicking cells to add grains. When a cell reaches 4 grains, it topples and distributes sand to neighbors, creating avalanches. Score points for each topple you trigger - highest score wins!
+            Two-player competitive game! The board starts with random sand grains (1-3 per cell). Players take turns clicking cells to add grains. Between turns, random grains are added automatically. When a cell reaches 4 grains, it topples and distributes sand to neighbors, creating avalanches. Score points for each topple you trigger - highest score wins!
         </div>
 
         <div class="grid-size-control">
             <label for="gridSize">Grid Size:</label>
             <input type="number" id="gridSize" min="5" max="30" value="15">
+            <label for="randomAdds" style="margin-left: 20px;">Random Adds Between Turns:</label>
+            <input type="number" id="randomAdds" min="0" max="10" value="2">
             <button onclick="resetGame()">New Game</button>
         </div>
 
@@ -285,15 +328,26 @@
         <div class="controls">
             <button onclick="resetGame()">Reset Game</button>
         </div>
+
+        <div class="power-law-plot">
+            <h2>📊 Power-Law Distribution (1/f Plot)</h2>
+            <div class="plot-description">
+                Stacked bar chart with logarithmic x-axis binning: [1-2], [3-4], [5-8], [9-16], ..., up to [513-1024].
+                X-axis: Log₂ scale (avalanche sizes). Y-axis: Linear scale (event count, 0-10 baseline, auto-scales upward).
+                Red = Player 1, Blue = Player 2, Gray = Random additions. Power-law behavior shows as right-skewed distribution.
+            </div>
+            <canvas id="powerLawCanvas" width="700" height="400"></canvas>
+        </div>
     </div>
 
     <script>
         class SandpileGame {
-            constructor(size) {
+            constructor(size, randomAdds) {
                 this.size = size;
-                // Initialize grid with random values from 0 to 3
+                this.randomAdds = randomAdds;
+                // Initialize grid with random values from 1 to 3
                 this.grid = Array(size).fill(0).map(() =>
-                    Array(size).fill(0).map(() => Math.floor(Math.random() * 4))
+                    Array(size).fill(0).map(() => Math.floor(Math.random() * 3) + 1)
                 );
                 this.player1Score = 0;
                 this.player2Score = 0;
@@ -301,6 +355,36 @@
                 this.moveCount = 0;
                 this.maxAvalanche = 0;
                 this.avalancheHistory = [];
+
+                // Track avalanche size distributions for power-law plot
+                this.player1Avalanches = {}; // {size: count}
+                this.player2Avalanches = {}; // {size: count}
+                this.randomAvalanches = {}; // {size: count}
+
+                this.setupCanvas();
+            }
+
+            setupCanvas() {
+                this.canvas = document.getElementById('powerLawCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.drawPowerLawPlot();
+            }
+
+            addRandomGrains() {
+                for (let n = 0; n < this.randomAdds; n++) {
+                    const row = Math.floor(Math.random() * this.size);
+                    const col = Math.floor(Math.random() * this.size);
+                    this.grid[row][col]++;
+                }
+
+                // Topple any resulting avalanches and track them
+                const avalancheSize = this.topple();
+                if (avalancheSize > 0) {
+                    this.randomAvalanches[avalancheSize] = (this.randomAvalanches[avalancheSize] || 0) + 1;
+                }
+
+                this.updateDisplay();
+                this.drawPowerLawPlot();
             }
 
             addGrain(row, col) {
@@ -312,8 +396,12 @@
                 if (avalancheSize > 0) {
                     if (this.currentPlayer === 1) {
                         this.player1Score += avalancheSize;
+                        // Track avalanche size for player 1
+                        this.player1Avalanches[avalancheSize] = (this.player1Avalanches[avalancheSize] || 0) + 1;
                     } else {
                         this.player2Score += avalancheSize;
+                        // Track avalanche size for player 2
+                        this.player2Avalanches[avalancheSize] = (this.player2Avalanches[avalancheSize] || 0) + 1;
                     }
                     this.maxAvalanche = Math.max(this.maxAvalanche, avalancheSize);
                     this.avalancheHistory.unshift({
@@ -328,6 +416,12 @@
                 this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
 
                 this.updateDisplay();
+                this.drawPowerLawPlot(); // Update the plot
+
+                // Add random grains after player move
+                if (this.randomAdds > 0) {
+                    setTimeout(() => this.addRandomGrains(), 300);
+                }
             }
 
             topple() {
@@ -433,13 +527,252 @@
                     }
                 }
             }
+
+            drawPowerLawPlot() {
+                const ctx = this.ctx;
+                const canvas = this.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+
+                // Set margins
+                const margin = { top: 20, right: 30, bottom: 60, left: 70 };
+                const plotWidth = width - margin.left - margin.right;
+                const plotHeight = height - margin.top - margin.bottom;
+
+                // Combine all avalanche sizes to determine range
+                const allSizes = new Set([
+                    ...Object.keys(this.player1Avalanches).map(Number),
+                    ...Object.keys(this.player2Avalanches).map(Number),
+                    ...Object.keys(this.randomAvalanches).map(Number)
+                ]);
+
+                // Create logarithmic bins up to 1024: [1-2], [3-4], [5-8], [9-16], [17-32], [33-64], etc.
+                const maxBinSize = 1024;
+                const bins = [];
+                let binStart = 1;
+
+                while (binStart <= maxBinSize) {
+                    const binEnd = binStart === 1 ? 2 : binStart * 2 - 1;
+                    bins.push({ start: binStart, end: Math.min(binEnd, maxBinSize), index: bins.length });
+                    binStart = binEnd + 1;
+                }
+
+                if (allSizes.size === 0) {
+                    // Draw empty plot with axes
+                    const logMaxSize = Math.ceil(Math.log2(maxBinSize + 1));
+                    this.drawAxes(ctx, margin, plotWidth, plotHeight, 1, Math.pow(2, logMaxSize), 0, 10);
+                    ctx.fillStyle = '#999';
+                    ctx.font = '14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Play some moves to see the power-law distribution!', width / 2, height / 2);
+                    return;
+                }
+
+                // Aggregate data into bins
+                const binData = bins.map(bin => {
+                    let p1Count = 0, p2Count = 0, randCount = 0;
+
+                    for (let size = bin.start; size <= bin.end; size++) {
+                        p1Count += this.player1Avalanches[size] || 0;
+                        p2Count += this.player2Avalanches[size] || 0;
+                        randCount += this.randomAvalanches[size] || 0;
+                    }
+
+                    return { bin, p1Count, p2Count, randCount, total: p1Count + p2Count + randCount };
+                });
+
+                // Calculate max count for scaling
+                const maxCount = Math.max(...binData.map(d => d.total), 1);
+
+                // Linear scale ranges - start from 0 to 10, scale up if needed
+                const logMaxSize = Math.ceil(Math.log2(maxBinSize + 1));
+                const yMin = 0;
+                const yMax = Math.max(10, maxCount);
+
+                // Draw axes
+                this.drawAxes(ctx, margin, plotWidth, plotHeight,
+                    1, Math.pow(2, logMaxSize),
+                    yMin, yMax);
+
+                // Draw bars with constant width in log space
+                const totalBins = bins.length;
+                const barWidth = plotWidth / totalBins;
+
+                binData.forEach((data, index) => {
+                    // Calculate bar position - constant width for each bin
+                    const barX = margin.left + index * barWidth;
+
+                    if (data.total === 0) return;
+
+                    // Draw stacked bars from bottom to top using linear scale
+                    let currentY = margin.top + plotHeight;
+
+                    // Player 1 (red) - bottom
+                    if (data.p1Count > 0) {
+                        const barHeight = (data.p1Count / yMax) * plotHeight;
+                        const barY = currentY - barHeight;
+
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(barX, barY, barWidth, barHeight);
+                        currentY = barY;
+                    }
+
+                    // Player 2 (blue) - middle
+                    if (data.p2Count > 0) {
+                        const cumulativeCount = data.p1Count + data.p2Count;
+                        const totalHeight = (cumulativeCount / yMax) * plotHeight;
+                        const barHeight = totalHeight - (margin.top + plotHeight - currentY);
+                        const barY = currentY - barHeight;
+
+                        ctx.fillStyle = '#3498db';
+                        ctx.fillRect(barX, barY, barWidth, barHeight);
+                        currentY = barY;
+                    }
+
+                    // Random (gray) - top
+                    if (data.randCount > 0) {
+                        const totalHeight = (data.total / yMax) * plotHeight;
+                        const barHeight = totalHeight - (margin.top + plotHeight - currentY);
+                        const barY = currentY - barHeight;
+
+                        ctx.fillStyle = '#95a5a6';
+                        ctx.fillRect(barX, barY, barWidth, barHeight);
+                    }
+
+                    // Draw bar outline
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 0.5;
+                    const totalBarHeight = (data.total / yMax) * plotHeight;
+                    ctx.strokeRect(barX, margin.top + plotHeight - totalBarHeight, barWidth, totalBarHeight);
+                });
+
+                // Draw legend
+                this.drawLegend(ctx, width, margin);
+            }
+
+            drawAxes(ctx, margin, plotWidth, plotHeight, minX, maxX, minY, maxY) {
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+
+                // Draw axes lines
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                // Y-axis
+                ctx.moveTo(margin.left, margin.top);
+                ctx.lineTo(margin.left, margin.top + plotHeight);
+                // X-axis
+                ctx.lineTo(margin.left + plotWidth, margin.top + plotHeight);
+                ctx.stroke();
+
+                // Draw grid and labels
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.fillStyle = '#666';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+
+                // X-axis ticks and grid (log2 scale - powers of 2)
+                const logMinX = Math.log2(minX);
+                const logMaxX = Math.log2(maxX);
+
+                for (let i = Math.ceil(logMinX); i <= logMaxX; i++) {
+                    const value = Math.pow(2, i);
+                    const x = margin.left + ((i - logMinX) / (logMaxX - logMinX)) * plotWidth;
+
+                    // Grid line
+                    ctx.beginPath();
+                    ctx.moveTo(x, margin.top);
+                    ctx.lineTo(x, margin.top + plotHeight);
+                    ctx.stroke();
+
+                    // Label
+                    ctx.fillText(value, x, margin.top + plotHeight + 20);
+                }
+
+                // Y-axis ticks and grid (linear scale)
+                // Calculate appropriate tick interval
+                const range = maxY - minY;
+                let tickInterval;
+                if (range <= 10) {
+                    tickInterval = 1;
+                } else if (range <= 20) {
+                    tickInterval = 2;
+                } else if (range <= 50) {
+                    tickInterval = 5;
+                } else if (range <= 100) {
+                    tickInterval = 10;
+                } else {
+                    tickInterval = Math.ceil(range / 10);
+                }
+
+                // Draw tick marks at regular intervals
+                for (let value = minY; value <= maxY; value += tickInterval) {
+                    const y = margin.top + plotHeight - ((value - minY) / (maxY - minY)) * plotHeight;
+
+                    // Grid line
+                    ctx.beginPath();
+                    ctx.moveTo(margin.left, y);
+                    ctx.lineTo(margin.left + plotWidth, y);
+                    ctx.stroke();
+
+                    // Label
+                    ctx.textAlign = 'right';
+                    ctx.fillText(Math.round(value), margin.left - 10, y + 4);
+                }
+
+                // Axis labels
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+
+                // X-axis label
+                ctx.fillText('Avalanche Size (log₂ scale)', margin.left + plotWidth / 2, height - 10);
+
+                // Y-axis label
+                ctx.save();
+                ctx.translate(15, margin.top + plotHeight / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('Number of Events', 0, 0);
+                ctx.restore();
+            }
+
+            drawLegend(ctx, width, margin) {
+                const legendX = width - margin.right - 130;
+                const legendY = margin.top + 10;
+
+                ctx.font = '12px Arial';
+
+                // Player 1
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(legendX, legendY - 4, 12, 12);
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'left';
+                ctx.fillText('Player 1', legendX + 18, legendY + 4);
+
+                // Player 2
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(legendX, legendY + 16, 12, 12);
+                ctx.fillStyle = '#333';
+                ctx.fillText('Player 2', legendX + 18, legendY + 24);
+
+                // Random
+                ctx.fillStyle = '#95a5a6';
+                ctx.fillRect(legendX, legendY + 36, 12, 12);
+                ctx.fillStyle = '#333';
+                ctx.fillText('Random', legendX + 18, legendY + 44);
+            }
         }
 
         let game;
 
         function initGame() {
             const size = parseInt(document.getElementById('gridSize').value) || 15;
-            game = new SandpileGame(size);
+            const randomAdds = parseInt(document.getElementById('randomAdds').value) || 0;
+            game = new SandpileGame(size, randomAdds);
             game.renderGrid();
             game.updateDisplay();
         }

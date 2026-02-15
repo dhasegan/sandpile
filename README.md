@@ -47,18 +47,21 @@ This is a two-player competitive game where players take turns trying to create 
 Compete against another player by creating larger avalanches. The player with the highest total score at the end wins!
 
 ### Initial State
-The game starts with a randomly initialized board where each cell contains 0-3 grains of sand. This means the system begins already close to criticality, allowing you to trigger avalanches more quickly.
+The game starts with a randomly initialized board where each cell contains 1-3 grains of sand. This means the system starts very close to criticality, allowing immediate avalanche activity.
 
 ### Rules
 1. **Players alternate turns** - Player 1 starts first
 2. **On your turn, click any cell** to add one grain of sand
-3. Each cell can hold 0-4 grains
-4. When a cell reaches **4 grains or more**, it **topples**:
+3. **Between turns, X random grains are added** to random locations (X is configurable, default is 2)
+   - This simulates continuous energy input, keeping the system near criticality
+   - Random avalanches from these additions don't score points
+4. Each cell can hold 0-4 grains
+5. When a cell reaches **4 grains or more**, it **topples**:
    - The cell loses 4 grains
    - Each of its 4 neighbors (up, down, left, right) gains 1 grain
-5. **Avalanches occur** when toppling triggers more toppling in a chain reaction
-6. **The active player scores 1 point per topple** in the avalanche they triggered
-7. After your move, the turn passes to the other player
+6. **Avalanches occur** when toppling triggers more toppling in a chain reaction
+7. **The active player scores 1 point per topple** in the avalanche they triggered
+8. After your move and the random additions, the turn passes to the other player
 
 ### Visual Guide
 - **Gray (0)**: Empty cell
@@ -80,7 +83,20 @@ The game starts with a randomly initialized board where each cell contains 0-3 g
 - **Two-player competitive mode**: Players take turns and compete for the highest score
 - **Turn indicator**: Clear visual display of whose turn it is
 - **Separate player scores**: Each player's score is tracked and displayed independently
-- **Random initialization**: Each game starts with cells randomly containing 0-3 grains, placing the system near criticality from the start
+- **Power-law visualization**: Real-time log-log plot showing avalanche size distribution
+  - Stacked bar chart with logarithmic binning: [1-2], [3-4], [5-8], [9-16], [17-32], ..., up to [513-1024]
+  - Equal-width bars in log space for proper statistical representation
+  - Three color-coded layers: Red (Player 1), Blue (Player 2), Gray (Random additions)
+  - Shows contributions from both players and system-driven avalanches
+  - A straight downward slope indicates power-law behavior (characteristic of SOC)
+  - X-axis: Log₂ scale for avalanche sizes
+  - Y-axis: Log₁₀ scale for event frequency
+- **Continuous driving mechanism**: Random grains are added between turns to simulate natural energy input
+  - Configurable rate (0-10 random additions per turn)
+  - Default is 2 random additions between each player move
+  - Avalanches from random additions are tracked separately in gray
+  - Makes the system more faithful to the original Bak-Tang-Wiesenfeld model
+- **Random initialization**: Each game starts with cells randomly containing 1-3 grains, placing the system at high criticality from the start
 - **Adjustable grid size**: From 5x5 to 30x30 cells
 - **Real-time visualization**: Watch avalanches cascade across the grid
 - **Score tracking**:
@@ -114,6 +130,18 @@ This implementation follows the Abelian sandpile model (Bak-Tang-Wiesenfeld mode
 
 The model was introduced by Per Bak, Chao Tang, and Kurt Wiesenfeld in 1987 as the first discovered example of self-organized criticality.
 
+### Is This Modified System Still SOC?
+
+**YES!** The random additions between turns actually make this implementation **MORE faithful** to the original BTW model.
+
+Key SOC properties maintained:
+- **Continuous driving**: Random grain additions simulate natural energy input (like sand falling on a pile)
+- **Fast relaxation**: Avalanches happen instantly when cells reach threshold
+- **Self-organization**: System maintains near-critical density without tuning
+- **Scale invariance**: Avalanches of all sizes can occur
+
+See [SOC_ANALYSIS.md](SOC_ANALYSIS.md) for a detailed analysis based on Per Bak's book "How Nature Works."
+
 ## Technical Details
 
 - **Pure HTML/CSS/JavaScript**: No frameworks or dependencies
@@ -123,11 +151,16 @@ The model was introduced by Per Bak, Chao Tang, and Kurt Wiesenfeld in 1987 as t
 
 ## Experiments to Try
 
-1. **Competitive Strategy**: Try different strategies - aggressive (always going for big avalanches) vs defensive (blocking opponent's setups)
-2. **Random Initial States**: Each new game starts with a different random configuration - observe how different initial conditions affect avalanche behavior
-3. **Grid Size Effects**: Compare avalanche distributions on small (10x10) vs large (25x25) grids - does grid size favor one strategy over another?
-4. **Pattern Recognition**: Notice how certain configurations reliably produce large avalanches
-5. **Edge Effects**: Observe how avalanches behave near boundaries vs. grid center
+1. **Random Addition Rate**: Try different rates (0, 1, 2, 5, 10) and observe how it affects:
+   - System stability (does it stay near critical or saturate?)
+   - Avalanche frequency and size distribution
+   - Player strategy (more chaotic with higher rates)
+2. **Competitive Strategy**: Try different strategies - aggressive (always going for big avalanches) vs defensive (blocking opponent's setups)
+3. **Random Initial States**: Each new game starts with a different random configuration - observe how different initial conditions affect avalanche behavior
+4. **Grid Size Effects**: Compare avalanche distributions on small (10x10) vs large (25x25) grids - does grid size favor one strategy over another?
+5. **Pattern Recognition**: Notice how certain configurations reliably produce large avalanches
+6. **Edge Effects**: Observe how avalanches behave near boundaries vs. grid center
+7. **SOC Verification**: Log avalanche sizes over many moves and plot on log-log scale to verify power-law distribution
 
 ## License
 
