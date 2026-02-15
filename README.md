@@ -47,21 +47,22 @@ This is a two-player competitive game where players take turns trying to create 
 Compete against another player by creating larger avalanches. The player with the highest total score at the end wins!
 
 ### Initial State
-The game starts with a randomly initialized board where each cell contains 1-3 grains of sand. This means the system starts very close to criticality, allowing immediate avalanche activity.
+The game starts with a randomly initialized board where each cell contains 1-3 grains of sand. This initialization allows immediate avalanche activity while maintaining realistic near-critical dynamics.
 
 ### Rules
 1. **Players alternate turns** - Player 1 starts first
 2. **On your turn, click any cell** to add one grain of sand
-3. **Between turns, X random grains are added** to random locations (X is configurable, default is 2)
+3. **Turn-based locking** - Players cannot click during animations or when it's not their turn
+4. **Between turns, X random grains are added** to random locations (X is configurable, default is 2)
    - This simulates continuous energy input, keeping the system near criticality
-   - Random avalanches from these additions don't score points
-4. Each cell can hold 0-4 grains
-5. When a cell reaches **4 grains or more**, it **topples**:
+   - Random avalanches from these additions are tracked separately and displayed in the Random Score
+5. Each cell can hold 0-4 grains (though cells with 4+ immediately topple)
+6. When a cell reaches **4 grains or more**, it **topples**:
    - The cell loses 4 grains
    - Each of its 4 neighbors (up, down, left, right) gains 1 grain
-6. **Avalanches occur** when toppling triggers more toppling in a chain reaction
-7. **The active player scores 1 point per topple** in the avalanche they triggered
-8. After your move and the random additions, the turn passes to the other player
+7. **Avalanches occur** when toppling triggers more toppling in a chain reaction
+8. **The active player scores 1 point per topple** in the avalanche they triggered
+9. After your move and the random additions, the turn passes to the other player
 
 ### Visual Guide
 - **Gray (0)**: Empty cell
@@ -81,8 +82,16 @@ The game starts with a randomly initialized board where each cell contains 1-3 g
 ## Features
 
 - **Two-player competitive mode**: Players take turns and compete for the highest score
-- **Turn indicator**: Clear visual display of whose turn it is
+- **Step-by-step avalanche visualization**: Watch avalanches propagate wave-by-wave with animated transitions
+  - Each toppling wave is displayed with a 150ms delay for clear visual feedback
+  - Toppling cells glow with bright red animations and scale effects
+- **Turn-based locking**: Grid is disabled during animations and between turns to prevent mis-clicks
+- **Dynamic turn indicator**: Color-coded turn display
+  - Red background: "Player 1's Turn"
+  - Blue background: "Player 2's Turn"
+  - Gray background: "Random Adds" (when random grains are being added between turns)
 - **Separate player scores**: Each player's score is tracked and displayed independently
+- **Random addition tracking**: Random avalanches are tracked separately with their own score and history entries
 - **Power-law visualization**: Real-time log-log plot showing avalanche size distribution
   - Stacked bar chart with logarithmic binning: [1-2], [3-4], [5-8], [9-16], [17-32], ..., up to [513-1024]
   - Equal-width bars in log space for proper statistical representation
@@ -90,21 +99,21 @@ The game starts with a randomly initialized board where each cell contains 1-3 g
   - Shows contributions from both players and system-driven avalanches
   - A straight downward slope indicates power-law behavior (characteristic of SOC)
   - X-axis: Log₂ scale for avalanche sizes
-  - Y-axis: Log₁₀ scale for event frequency
+  - Y-axis: Linear scale for event count (auto-scales with minimum baseline of 10)
 - **Continuous driving mechanism**: Random grains are added between turns to simulate natural energy input
   - Configurable rate (0-10 random additions per turn)
   - Default is 2 random additions between each player move
-  - Avalanches from random additions are tracked separately in gray
+  - Avalanches from random additions are tracked separately in gray with dedicated score
   - Makes the system more faithful to the original Bak-Tang-Wiesenfeld model
-- **Random initialization**: Each game starts with cells randomly containing 1-3 grains, placing the system at high criticality from the start
+- **Weighted random initialization**: Each game starts with cells containing 0-3 grains with probabilities that place the system near criticality
 - **Adjustable grid size**: From 5x5 to 30x30 cells
-- **Real-time visualization**: Watch avalanches cascade across the grid
+- **Real-time visualization**: Watch avalanches cascade across the grid with smooth animations
 - **Score tracking**:
-  - Individual scores for Player 1 and Player 2
+  - Individual scores for Player 1, Player 2, and Random additions
   - Number of moves made
-  - Largest avalanche achieved (by either player)
-- **Avalanche history**: Track the last 20 avalanches with player attribution, positions, and sizes
-- **Smooth animations**: Visual feedback when cells topple
+  - Largest avalanche achieved (by any source)
+- **Avalanche history**: Track the last 20 avalanches with player/source attribution, positions, and sizes
+- **Smooth animations**: Visual feedback when cells topple with glow effects and scaling
 - **Responsive design**: Works on desktop and tablet screens
 
 ## Game Statistics
@@ -113,10 +122,11 @@ The game tracks several key metrics:
 
 1. **Player 1 Score**: Total topples triggered by Player 1
 2. **Player 2 Score**: Total topples triggered by Player 2
-3. **Moves Made**: Total number of turns taken by both players
-4. **Largest Avalanche**: The biggest single avalanche created by either player
+3. **Random Score**: Total topples triggered by random grain additions
+4. **Moves Made**: Total number of turns taken by both players
+5. **Largest Avalanche**: The biggest single avalanche created by any source (players or random)
 
-The active player's score box is highlighted with a colored border to indicate whose turn it is.
+The active player's score box is highlighted with a colored border to indicate whose turn it is. During random additions, the turn indicator changes to gray with "Random Adds" text.
 
 ## Scientific Background
 
@@ -147,6 +157,8 @@ See [SOC_ANALYSIS.md](SOC_ANALYSIS.md) for a detailed analysis based on Per Bak'
 - **Pure HTML/CSS/JavaScript**: No frameworks or dependencies
 - **Single file**: Everything contained in `sandpile.html`
 - **Efficient algorithm**: Uses iterative relaxation to compute avalanches
+- **Async/await animations**: Step-by-step avalanche visualization with 150ms delays between toppling waves
+- **State management**: Turn-based locking using `isProcessing` and `isRandomPhase` flags
 - **Responsive grid**: Adapts to different screen sizes
 
 ## Experiments to Try
@@ -155,12 +167,16 @@ See [SOC_ANALYSIS.md](SOC_ANALYSIS.md) for a detailed analysis based on Per Bak'
    - System stability (does it stay near critical or saturate?)
    - Avalanche frequency and size distribution
    - Player strategy (more chaotic with higher rates)
-2. **Competitive Strategy**: Try different strategies - aggressive (always going for big avalanches) vs defensive (blocking opponent's setups)
-3. **Random Initial States**: Each new game starts with a different random configuration - observe how different initial conditions affect avalanche behavior
-4. **Grid Size Effects**: Compare avalanche distributions on small (10x10) vs large (25x25) grids - does grid size favor one strategy over another?
-5. **Pattern Recognition**: Notice how certain configurations reliably produce large avalanches
-6. **Edge Effects**: Observe how avalanches behave near boundaries vs. grid center
-7. **SOC Verification**: Log avalanche sizes over many moves and plot on log-log scale to verify power-law distribution
+2. **Avalanche Propagation**: Watch the step-by-step animations to observe:
+   - How avalanches spread in waves across the grid
+   - The difference between small localized avalanches and large cascading ones
+   - How boundary effects limit avalanche propagation at edges
+3. **Competitive Strategy**: Try different strategies - aggressive (always going for big avalanches) vs defensive (blocking opponent's setups)
+4. **Random Initial States**: Each new game starts with a different weighted random distribution (0-3 grains) - observe how different initial conditions affect early game dynamics
+5. **Grid Size Effects**: Compare avalanche distributions on small (10x10) vs large (25x25) grids - does grid size favor one strategy over another?
+6. **Pattern Recognition**: Notice how certain configurations reliably produce large avalanches
+7. **Edge Effects**: Observe how avalanches behave near boundaries vs. grid center
+8. **SOC Verification**: Log avalanche sizes over many moves and plot on log-log scale to verify power-law distribution
 
 ## License
 
